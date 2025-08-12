@@ -167,3 +167,4 @@ class WishList(models.Model):
     class Meta:
         unique_together = ('user', 'flight')
         ordering = ['-created_at']
+
