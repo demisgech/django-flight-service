@@ -18,7 +18,7 @@ class PromotionFactory(django.DjangoModelFactory):
     class Meta:
         model = Promotion
         
-    title = faker.Faker('catch_phrase', nb_words=3)
+    title = faker.Faker('catch_phrase')
     discount = faker.Faker('pydecimal', left_digits=2, right_digits=2, positive=True)
     start_date = factory.LazyFunction(lambda: timezone.now() + timezone.timedelta(days=random.randint(1,25)))
     end_date = factory.LazyFunction(lambda: timezone.now() + timezone.timedelta(days=random.randint(30, 400)))
@@ -70,7 +70,7 @@ class AirportFactory(django.DjangoModelFactory):
     iata_code = factory.LazyFunction(lambda: ''.join(random.choices(string.ascii_uppercase, k=3)))
     icao_code = factory.LazyFunction(lambda: ''.join(random.choices(string.ascii_uppercase, k=4)))
     latitude = faker.Faker('pydecimal', left_digits=2, right_digits=6, positive=False)
-    longitude = faker.Faker('pydecimal', left_digits=3, right_digits=6, positive=False)
+    longitude = faker.Faker('pydecimal', left_digits=2, right_digits=6, positive=False)
     time_zone = faker.Faker('timezone')
 
 

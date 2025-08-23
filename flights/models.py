@@ -27,7 +27,7 @@ class Customer(models.Model):
         blank=True,
         default='other'
     )
-    phone_number = models.CharField(max_length=20, null=True, blank=True)
+    phone_number = models.CharField(max_length=30, null=True, blank=True)
     passport_number = models.CharField(max_length=20, null=True, blank=True, unique=True)
     passport_expiry = models.DateField(null=True, blank=True)
     nationality = models.CharField(max_length=50, null=True, blank=True)
