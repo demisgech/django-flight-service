@@ -14,6 +14,9 @@ class Promotion(models.Model):
         from django.utils.timezone import now
         return self.start_date <= now() <= self.end_date
 
+    def __str__(self) -> str:
+        return self.title
+
 
 class Customer(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name='customer_profile')
@@ -21,14 +24,15 @@ class Customer(models.Model):
     gender = models.CharField(
         max_length=10,
         choices=[("male", "Male"), ("female", "Female"), ("other", "Other")],
-        blank=True
+        blank=True,
+        default='other'
     )
     phone_number = models.CharField(max_length=20, null=True, blank=True)
     passport_number = models.CharField(max_length=20, null=True, blank=True, unique=True)
     passport_expiry = models.DateField(null=True, blank=True)
     nationality = models.CharField(max_length=50, null=True, blank=True)
     preferred_language = models.CharField(max_length=10, choices=[('en', 'English'), ('am', 'Amharic')], default='en')
-    preferred_currency = models.ForeignKey('Currency', on_delete=models.SET_NULL, null=True, blank=True)
+    preferred_currency = models.ForeignKey('Currency', on_delete=models.CASCADE, null=True, blank=True)
     loyalty_points = models.PositiveIntegerField(default=0)
     loyalty_tier = models.CharField(max_length=20, choices=[
         ('bronze', 'Bronze'),
@@ -38,6 +42,8 @@ class Customer(models.Model):
     ], default='bronze')
     # profile_image = models.ImageField(upload_to='profiles/', null=True, blank=True)
 
+    def __str__(self) -> str:
+        return f"{self.user.first_name} {self.user.last_name}"
 
 
 class Address(models.Model):
@@ -47,6 +53,9 @@ class Address(models.Model):
     state = models.CharField(max_length=5)
     customer = models.ForeignKey(Customer,on_delete=models.CASCADE)
 
+    def __str__(self) -> str:
+        return f"{self.street}, {self.city}"
+    
     
 class Airport(models.Model):
     name = models.CharField(max_length=150)
@@ -58,13 +67,11 @@ class Airport(models.Model):
     longitude = models.DecimalField(max_digits=8,decimal_places=6)
     time_zone = models.CharField(max_length=50)
     
+    def __str__(self) -> str:
+        return self.name
+    
 
 class Flight(models.Model):
-    FLIGHT_STATUS = [
-        ('On time',"On time"),
-        ('delayed','Delayed'),
-        ('canceled','Canceled')
-    ]
     airline = models.CharField(max_length=150)
     flight_number = models.CharField(max_length=10,unique=True)
     departure_time = models.DateTimeField()
@@ -76,14 +83,35 @@ class Flight(models.Model):
         validators=[MinValueValidator(1)]
     )
     price = models.DecimalField(max_digits=10,decimal_places=2)
-    status = models.CharField(max_length=10,choices=FLIGHT_STATUS,default="On time")
     promotions = models.ManyToManyField(Promotion,related_name='flights')
+
+    def __str__(self) -> str:
+        return self.airline
+    
+    @property
+    def current_status(self):
+        latest = self.statuses.order_by('-updated_at').first()
+        return latest.status if latest else "Unknown"
+    
 
 
 class FlightStatus(models.Model):
-    flight = models.ForeignKey(Flight,on_delete=models.CASCADE)
-    current_status  = models.CharField(max_length=50)
-    status_update_time = models.DateTimeField(auto_now=True)
+    FLIGHT_STATUS = [
+        ('on_time',"On time"),
+        ('delayed','Delayed'),
+        ('canceled','Canceled'),
+        ('boarding','Boarding')
+    ]
+      
+    flight = models.ForeignKey(Flight,on_delete=models.CASCADE,related_name='statuses')
+    status = models.CharField(max_length=10,choices=FLIGHT_STATUS,default="on_time")
+    updated_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-updated_at']
+    
+    def __str__(self):
+        return f"{self.flight.flight_number} - {self.status} ({self.updated_at})"
     
 
 class Booking(models.Model):
@@ -98,7 +126,7 @@ class Booking(models.Model):
         ('paid','Paid'),
         ('pending','Pending'),
         ("failed","Failed")
-    ],default='Pending')
+    ],default='pending')
    
 
 class Currency(models.Model):
@@ -111,6 +139,8 @@ class Currency(models.Model):
     )
     last_update = models.DateTimeField(auto_now_add=True)
     
+    def __str__(self) -> str:
+        return self.name
     class Meta:
         ordering = ['-last_update']
     
@@ -124,7 +154,7 @@ class PaymentMethod(models.Model):
     ]
     name = models.CharField(max_length=255,choices=PAYMENT_METHODS,default="paypal")
     
-    
+    # transaction_id has to be refactored
 class Payment(models.Model):
     booking = models.ForeignKey(Booking,on_delete=models.CASCADE,related_name='payments')
     payment_method = models.ForeignKey(PaymentMethod,on_delete=models.PROTECT)
