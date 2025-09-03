@@ -12,7 +12,7 @@ class Promotion(models.Model):
     @property
     def is_active(self):
         from django.utils.timezone import now
-        return self.start_date <= now() <= self.end_date
+        return "✅ Yes" if self.start_date <= now() <= self.end_date else "❌ No"
 
     def __str__(self) -> str:
         return self.title
@@ -127,6 +127,12 @@ class Booking(models.Model):
         ('pending','Pending'),
         ("failed","Failed")
     ],default='pending')
+    
+    class Meta:
+        ordering = ['-booking_date']
+    
+    def __str__(self) -> str:
+        return f"{self.user.get_full_name()} for {self.flight.airline}"
    
 
 class Currency(models.Model):
@@ -155,6 +161,11 @@ class PaymentMethod(models.Model):
     name = models.CharField(max_length=255,choices=PAYMENT_METHODS,default="paypal")
     
     # transaction_id has to be refactored
+    
+    def __str__(self) -> str:
+        return self.name
+    
+    
 class Payment(models.Model):
     booking = models.ForeignKey(Booking,on_delete=models.CASCADE,related_name='payments')
     payment_method = models.ForeignKey(PaymentMethod,on_delete=models.PROTECT)
