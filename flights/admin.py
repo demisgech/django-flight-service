@@ -5,9 +5,9 @@ from rest_framework.request import Request
 from .filters import CustomerLoyaltyPointsFilter
 from .models import (
     Address, Airport, Booking, Currency, Customer, Flight,
-    FlightStatus, Payment, PaymentMethod, Promotion, Review, Seat, WishList
+    FlightStatus, Payment, PaymentMethod, PaymentStatus,
+    Promotion, Review, Seat, SeatClass, Wishlist
     )
-
 
 
 admin.site.site_header = "Flight Booking Administration"
@@ -71,10 +71,18 @@ class AirportAdmin(admin.ModelAdmin):
     search_fields = ['name','city','iata_code','icao_code']
     
 
+class PaymentStatusInline(admin.StackedInline):
+    model = PaymentStatus
+    min_num = 1
+    max_num = 10
+    extra = 0
+    
+    
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
     autocomplete_fields = ['user','flight']
-    list_display = ['user','flight','booking_date','seats','price_at_booking','payment_status']
+    list_display = ['user','flight','booking_date',
+                    'seats','price_at_booking','payment_status']
     list_select_related = ['user','flight']
     list_per_page = 10
     actions = [
@@ -97,6 +105,12 @@ class BookingAdmin(admin.ModelAdmin):
         queryset.update(payment_status='pending')
 
 
+@admin.register(PaymentStatus)
+class PaymentStatusAdmin(admin.ModelAdmin):
+    list_display = ['id','name']
+    list_per_page = 10
+    search_fields = ['name']
+
 @admin.register(PaymentMethod)
 class PaymentMethodAdmin(admin.ModelAdmin):
     list_display = ['name']
@@ -115,11 +129,12 @@ class PaymentAdmin(admin.ModelAdmin):
     search_fields = ['transaction_id']
 
 
-class FlightStatusInline(admin.TabularInline):
-    model = FlightStatus
-    min_num = 1
-    max_num = 10
-    extra = 0
+
+@admin.register(FlightStatus)
+class FlightStatusAdmin(admin.ModelAdmin):
+    list_display = ['id','name']
+    search_fields = ['name']
+    list_per_page = 10
     
 
 class SeatInline(admin.TabularInline):
@@ -134,15 +149,15 @@ class FlightAdmin(admin.ModelAdmin):
     autocomplete_fields = ['departure_airport','arrival_airport']
     list_display = ['airline','flight_number','departure_airport',
                     'arrival_airport','arrival_time','departure_time',
-                    'duration','price','seat_capacity'
+                    'duration','price','seat_capacity','status'
                     ]
     search_fields = ['airline','flight_number',
                      'arrival_airport__name__icontains',
                      'departure_airport__name__icontains']
-    inlines = [FlightStatusInline, SeatInline]
+    inlines = [SeatInline]
     list_per_page = 10
     list_editable = ['price','seat_capacity','duration']
-    list_filter = ['arrival_time','departure_time']
+    list_filter = ['arrival_time','departure_time','status']
     filter_horizontal = ['promotions']
     date_hierarchy = 'departure_time'
 
@@ -155,7 +170,7 @@ class ReviewAdmin(admin.ModelAdmin):
     list_filter = ['rating','date']
     
 
-@admin.register(WishList)
+@admin.register(Wishlist)
 class WishlistAdmin(admin.ModelAdmin):
     autocomplete_fields = ['user','flight']
     list_display = ['user','flight','created_at']
@@ -167,13 +182,21 @@ class WishlistAdmin(admin.ModelAdmin):
                      'flight__airline__icontains']
     
 
+@admin.register(SeatClass)
+class SeatClassAdmin(admin.ModelAdmin):
+    list_display = ['id','name']
+    search_fields = ['name']
+    list_filter = ['name']
+
+
 @admin.register(Seat)
 class SeatAdmin(admin.ModelAdmin):
     actions = ['mark_available','mark_unavailable']
-    autocomplete_fields = ['flight']
+    autocomplete_fields = ['flight',"seat_class"]
     list_display = ['seat_number','seat_class','flight','availability']
-    list_filter = ['seat_class','availability']
+    list_filter = ['seat_class__name','availability']
     list_per_page = 10
+    list_select_related = ['seat_class','flight']
     search_fields = ['seat_number','flight__flight_number']
     
     @admin.action(description='Mark Available')

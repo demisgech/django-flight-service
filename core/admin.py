@@ -1,5 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.contenttypes.admin import(
+    GenericStackedInline, GenericTabularInline
+)
 
 from flights.admin import FlightAdmin,BookingAdmin
 from core.models import User
@@ -23,7 +26,7 @@ class UserAdmin(BaseUserAdmin):
     ),)
     
 
-class TaggedItemInline(admin.TabularInline):
+class TaggedItemInline(GenericStackedInline):
     autocomplete_fields = ['tag']
     model = TaggedItem
     min_num = 1
@@ -31,8 +34,16 @@ class TaggedItemInline(admin.TabularInline):
     extra = 0
     
 
-# admin.site.unregister(Booking)
+admin.site.unregister(Booking)
 
-# @admin.register(Booking)
-# class CoreBookingAdmin(BookingAdmin):
-#     inlines = [TaggedItemInline]
+@admin.register(Booking)
+class CoreBookingAdmin(BookingAdmin):
+    inlines = [TaggedItemInline]
+    
+
+admin.site.unregister(Flight)
+@admin.register(Flight)
+class CoreFlightAdmin(FlightAdmin):
+    inlines = [*FlightAdmin.inlines,TaggedItemInline]
+    
+    

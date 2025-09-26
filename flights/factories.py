@@ -5,20 +5,21 @@ from factory import django, faker, declarations
 import factory
 
 from core.factories import UserFactory
+from core.models import User
 from .models import (
     Address, Airport, Booking, 
     Currency, Customer, Flight, 
-    FlightStatus, Payment, PaymentMethod,
-    Promotion, Review, Seat, WishList
+    FlightStatus, Payment, PaymentMethod, PaymentStatus,
+    Promotion, Review, Seat, SeatClass, Wishlist
     )
 
 
 class PromotionFactory(django.DjangoModelFactory):
-    
     class Meta:
         model = Promotion
         
     title = faker.Faker('catch_phrase')
+    description = faker.Faker("sentence")
     discount = faker.Faker('pydecimal', left_digits=2, right_digits=2, positive=True)
     start_date = factory.LazyFunction(lambda: timezone.now() + timezone.timedelta(days=random.randint(1,25)))
     end_date = factory.LazyFunction(lambda: timezone.now() + timezone.timedelta(days=random.randint(30, 400)))
@@ -47,7 +48,7 @@ class CustomerFactory(django.DjangoModelFactory):
     preferred_language = factory.Iterator(['en','am'])
     loyalty_points = faker.Faker('random_int', min=0, max=10000)
     loyalty_tier = factory.Iterator(['bronze', 'silver', 'gold', 'platinum'])
-    preferred_currency = declarations.SubFactory(CurrencyFactory)
+    preferred_currency = factory.LazyFunction(lambda: Currency.objects.order_by("?").first())
 
 
 class AddressFactory(django.DjangoModelFactory):
@@ -58,7 +59,7 @@ class AddressFactory(django.DjangoModelFactory):
     city = faker.Faker('city')
     zip = faker.Faker('postcode')
     state = faker.Faker('state_abbr')
-    customer = declarations.SubFactory(CustomerFactory)
+    customer = declarations.LazyFunction(lambda: Customer.objects.order_by("?").first())
     
 
 class AirportFactory(django.DjangoModelFactory):
@@ -73,6 +74,11 @@ class AirportFactory(django.DjangoModelFactory):
     longitude = faker.Faker('pydecimal', left_digits=2, right_digits=6, positive=False)
     time_zone = faker.Faker('timezone')
 
+class FlightStatusFactory(django.DjangoModelFactory):
+    class Meta:
+        model = FlightStatus
+    name = factory.Iterator(['on_time','boarding', 'delayed', 'cancelled'])
+
 
 class FlightFactory(django.DjangoModelFactory):
     class Meta:
@@ -81,13 +87,13 @@ class FlightFactory(django.DjangoModelFactory):
     airline = faker.Faker('company')
     flight_number = factory.declarations.Sequence(lambda n: f'FL{1000 + n}')
     departure_time = factory.LazyFunction(lambda: timezone.now() + timezone.timedelta(days=1))
-    departure_airport = factory.SubFactory(AirportFactory)
+    departure_airport = factory.LazyFunction(lambda: Airport.objects.order_by("?").first())
     arrival_time = factory.LazyAttribute(lambda obj: obj.departure_time + timezone.timedelta(hours=2))
-    arrival_airport = factory.SubFactory(AirportFactory)
+    arrival_airport = factory.LazyFunction(lambda: Airport.objects.order_by("?").first())
     duration = factory.LazyAttribute(lambda obj: obj.arrival_time - obj.departure_time)
     seat_capacity = faker.Faker('random_int', min=50, max=300)
     price = faker.Faker('pydecimal', left_digits=3, right_digits=2, positive=True)
-    
+    status = factory.LazyFunction(lambda: FlightStatus.objects.order_by("?").first())
     
     @factory.post_generation
     def promotions(self, create, extracted, **kwargs):
@@ -97,29 +103,27 @@ class FlightFactory(django.DjangoModelFactory):
             for promo in extracted:
                 self.promotions.add(promo)
         else:
-            self.promotions.add(PromotionFactory())
-            
-class FlightStatusFactory(django.DjangoModelFactory):
+            promotion = Promotion.objects.order_by("?").first() or PromotionFactory()
+            self.promotions.add(promotion)
+
+
+class PaymentStatusFactory(django.DjangoModelFactory):
     class Meta:
-        model = FlightStatus
+        model = PaymentStatus
+    name = factory.Iterator(['pending', 'completed', 'failed'])
     
-    flight = factory.SubFactory(FlightFactory)
-    status = factory.Iterator(['on_time','boarding', 'delayed', 'cancelled'])
-
-
-
+    
 class BookingFactory(django.DjangoModelFactory):
     class Meta:
         model = Booking
     
-    user = factory.SubFactory(UserFactory)
-    flight = factory.SubFactory(FlightFactory)
+    user = factory.LazyFunction(lambda: User.objects.order_by("?").first())
+    flight = factory.LazyFunction(lambda: Flight.objects.order_by("?").first())
     booking_date = factory.LazyFunction(timezone.now)
     seats = faker.Faker('random_int', min=1, max=5)
     price_at_booking = factory.LazyAttribute(lambda obj: obj.seats * obj.flight.price)
-    payment_status = factory.Iterator(['pending', 'completed', 'failed'])
-    
-    
+    payment_status = factory.LazyFunction(lambda: PaymentStatus.objects.order_by("?").first())
+     
 
 class PaymentMethodFactory(django.DjangoModelFactory):
     class Meta:
@@ -132,20 +136,27 @@ class PaymentFactory(django.DjangoModelFactory):
     class Meta:
         model = Payment
     
-    booking = factory.SubFactory(BookingFactory)
-    payment_method = factory.SubFactory(PaymentMethodFactory)
+    booking = factory.LazyFunction(lambda: Booking.objects.order_by("?").first())
+    payment_method = factory.LazyFunction(lambda: PaymentMethod.objects.order_by("?").first())
     amount = faker.Faker('pydecimal',left_digits=3,right_digits=2,positive=True)
     transaction_id = factory.Sequence(lambda n: f"TX{1000 + n}")
-    currency = factory.SubFactory(CurrencyFactory)
+    currency = factory.LazyFunction(lambda: Currency.objects.order_by("?").first())
+
+
+class SeatClassFactory(django.DjangoModelFactory):
+    class Meta:
+        model = SeatClass
+        
+    name = factory.Iterator(['economy','business'])
     
     
 class SeatFactory(django.DjangoModelFactory):
     class Meta:
         model = Seat
     
-    flight = factory.SubFactory(FlightFactory)
+    flight = factory.LazyFunction(lambda: Flight.objects.order_by("?").first())
     seat_number = factory.Sequence(lambda n: f"{(n // 6) + 1}{chr(65 + (n % 6))}")
-    seat_class = factory.Iterator(['economy','business'])
+    seat_class = factory.LazyFunction(lambda: SeatClass.objects.order_by("?").first())
     availability = faker.Faker('boolean')
 
 
@@ -153,16 +164,16 @@ class ReviewFactory(django.DjangoModelFactory):
     class Meta:
         model = Review
     
-    user = factory.SubFactory(UserFactory)
-    flight = factory.SubFactory(FlightFactory)
+    user = factory.LazyFunction(lambda: User.objects.order_by("?").first())
+    flight = factory.LazyFunction(lambda: Flight.objects.order_by("?").first())
     rating = factory.Iterator([0,1,2,3,4,5])
     description = faker.Faker('sentence')
     
 
 class WishlistFactory(django.DjangoModelFactory):
     class Meta:
-        model = WishList
+        model = Wishlist
     
-    user = factory.SubFactory(UserFactory)
-    flight = factory.SubFactory(FlightFactory)
+    user = factory.LazyFunction(lambda: User.objects.order_by("?").first())
+    flight = factory.LazyFunction(lambda: Flight.objects.order_by("?").first())
     

@@ -5,6 +5,7 @@ from django.core.validators import MinValueValidator
 
 class Promotion(models.Model):
     title = models.CharField(max_length=150)
+    description = models.TextField()
     discount = models.DecimalField(max_digits=5, decimal_places=2, validators=[MinValueValidator(0)])
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
@@ -69,6 +70,19 @@ class Airport(models.Model):
     
     def __str__(self) -> str:
         return self.name
+
+
+class FlightStatus(models.Model):
+    FLIGHT_STATUS = [
+        ('on_time',"On time"),
+        ('delayed','Delayed'),
+        ('canceled','Canceled'),
+        ('boarding','Boarding')
+    ]
+    name = models.CharField(max_length=10,choices=FLIGHT_STATUS,default="on_time")
+    
+    def __str__(self):
+        return self.name
     
 
 class Flight(models.Model):
@@ -82,36 +96,25 @@ class Flight(models.Model):
     seat_capacity = models.PositiveIntegerField(
         validators=[MinValueValidator(1)]
     )
+    status = models.ForeignKey(FlightStatus,on_delete=models.CASCADE,
+                               related_name="flights",default=1)
+    updated_at = models.DateTimeField(auto_now_add=True)
     price = models.DecimalField(max_digits=10,decimal_places=2)
     promotions = models.ManyToManyField(Promotion,related_name='flights')
 
     def __str__(self) -> str:
         return self.airline
-    
-    @property
-    def current_status(self):
-        latest = self.statuses.order_by('-updated_at').first()
-        return latest.status if latest else "Unknown"
-    
 
 
-class FlightStatus(models.Model):
-    FLIGHT_STATUS = [
-        ('on_time',"On time"),
-        ('delayed','Delayed'),
-        ('canceled','Canceled'),
-        ('boarding','Boarding')
-    ]
-      
-    flight = models.ForeignKey(Flight,on_delete=models.CASCADE,related_name='statuses')
-    status = models.CharField(max_length=10,choices=FLIGHT_STATUS,default="on_time")
-    updated_at = models.DateTimeField(auto_now_add=True)
+class PaymentStatus(models.Model):
+    name = models.CharField(max_length=20,choices=[
+        ('paid','Paid'),
+        ('pending','Pending'),
+        ("failed","Failed")
+    ],default='pending')
     
-    class Meta:
-        ordering = ['-updated_at']
-    
-    def __str__(self):
-        return f"{self.flight.flight_number} - {self.status} ({self.updated_at})"
+    def __str__(self) -> str:
+        return self.name
     
 
 class Booking(models.Model):
@@ -122,11 +125,8 @@ class Booking(models.Model):
         validators=[MinValueValidator(1)]
     )
     price_at_booking = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_status = models.CharField(max_length=20,choices=[
-        ('paid','Paid'),
-        ('pending','Pending'),
-        ("failed","Failed")
-    ],default='pending')
+    payment_status = models.ForeignKey(PaymentStatus,on_delete=models.CASCADE,
+                                       related_name="bookings",default=1)
     
     class Meta:
         ordering = ['-booking_date']
@@ -174,14 +174,24 @@ class Payment(models.Model):
     transaction_id = models.CharField(max_length=100,unique=True)
     currency = models.ForeignKey(Currency, on_delete=models.PROTECT)
     
+    def __str__(self) -> str:
+        return f"${self.amount} successfully paid with {self.payment_method.name}"
+
+
+class SeatClass(models.Model):
+    name = models.CharField(max_length=20,choices=[
+        ('economy','Economy'),
+        ('business','Business')
+    ],default='economy')
+    
+    def __str__(self) -> str:
+        return self.name
     
 class Seat(models.Model):
     flight = models.ForeignKey(Flight,on_delete=models.CASCADE)
     seat_number = models.CharField(max_length=10)
-    seat_class = models.CharField(max_length=20,choices=[
-        ('economy','Economy'),
-        ('business','Business')
-    ],default='economy')
+    seat_class = models.ForeignKey(SeatClass,on_delete=models.CASCADE,
+                                   related_name="seats",default=1)
     availability = models.BooleanField(default=True)
     
     class Meta:
@@ -201,7 +211,7 @@ class Review(models.Model):
         ordering = ['-date']
 
 
-class WishList(models.Model):
+class Wishlist(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name="wishlist_items")
     flight = models.ForeignKey(Flight,on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)

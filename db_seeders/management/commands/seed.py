@@ -14,7 +14,7 @@ class Command(BaseCommand):
     def handle(self, *args:Any, **options:Any):
         self.stdout.write(self.style.SUCCESS('Seeding the database...'))
         
-        # core_app_seeder.run(data=options['core'])
+        core_app_seeder.run(data=options['core'])
         flights_app_seeder.run(data=options['flights'])
 
         
